@@ -7,7 +7,7 @@ from seqsum import lib
 
 
 def sum(
-    input: str | Path,
+    input: Path,
     *,
     alphabet: lib.Alphabet = lib.default_alphabet,
     bits: int = lib.default_bits,
@@ -16,12 +16,15 @@ def sum(
     """
     Generate checksum(s) for fasta/fastq sequences supplied as string, file, or stdin
 
-    :arg input: string, fasta/fastq path, or stdin
+    :arg input: path to fasta/fastq file (supports gzip, bzip2, xz or zst compression)
     :arg alphabet: input sequence alphabet
     :arg bits: keep this many bits of the message digest
-    :arg json: output json
+    :arg json: output json rather
     """
-    checksums = lib.sum(input, alphabet=alphabet, bits=bits, stdout=not json)
+    if str(input) == "-":
+        checksums = lib.sum_stdin(alphabet=alphabet, bits=bits, stdout=not json)
+    else:
+        checksums = lib.sum_file(input, alphabet=alphabet, bits=bits, stdout=not json)
     if json:
         print(json_.dumps(checksums, indent=4))
 
