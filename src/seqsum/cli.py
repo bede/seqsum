@@ -1,3 +1,4 @@
+import json as json_
 from pathlib import Path
 
 import defopt
@@ -5,18 +6,25 @@ import defopt
 from seqsum import lib
 
 
-def sum(input: str | Path, *, function: str = "xxh128"):
+def sum(
+    input: str | Path,
+    *,
+    alphabet: lib.Alphabet = lib.default_alphabet,
+    bits: int = lib.default_bits,
+    json: bool = False
+):
     """
-    Generate a checksum from the supplied string or path
+    Generate checksum(s) for fasta/fastq sequences supplied as string, file, or stdin
 
-    :arg input: string or path of input
-    :arg function: hash
+    :arg input: string, fasta/fastq path, or stdin
+    :arg alphabet: input sequence alphabet
+    :arg bits: keep this many bits of the message digest
+    :arg json: output json
     """
-    hex_digest = lib.sum_bytes_or_file(input, function=function)
-    print(hex_digest)
+    checksums = lib.sum(input, alphabet=alphabet, bits=bits, stdout=not json)
+    if json:
+        print(json_.dumps(checksums, indent=4))
 
 
 def main():
-    defopt.run(
-        sum,
-    )
+    defopt.run(sum, no_negated_flags=True)
