@@ -12,54 +12,51 @@ logging.basicConfig(format="%(levelname)s: %(message)s", level=logging.INFO)
 
 
 alphabets = {
-    "bio": "*ABCDEFGHIKLMNPQRSTVWY-",  # union(nt, aa)
-    "nt": "ABCDGHKMNRSTVWY",  # Bio.Alphabet.IUPAC.IUPACAmbiguousDNA
-    "aa": "*ACDEFGHIKLMNPQRSTVWY",  # Bio.Alphabet.IUPAC.ExtendedIUPACProtein
+    # Includes "-" as optimisation; these are stripped prior to hashing
+    "nt": set("ABCDGHKMNRSTVWY") | set("-"),  # Bio.Alphabet.IUPAC.IUPACAmbiguousDNA
+    "aa": set("*ACDEFGHIKLMNPQRSTVWY")
+    | set("-"),  # Bio.Alphabet.IUPAC.ExtendedIUPACProtein
 }
 Alphabet = enum.Enum("Alphabet", list(alphabets.keys()))
-default_alphabet = Alphabet.bio
 
 default_bits = 64
 
 
 class AlphabetError(Exception):
-    pass
+    def __init__(self, message="Record(s) contain characters not in alphabet"):
+        super().__init__(message)
 
 
-class BitDepthError(Exception):
+class BitLengthError(Exception):
     def __init__(self, message="Bit depth must be a multiple of 4 between 4 and 128"):
         super().__init__(message)
 
 
 def validate_bits(bits: int) -> None:
     if not 4 < bits < 128 or bits % 4 != 0:
-        raise BitDepthError
+        raise BitLengthError
 
 
-def normalise(
-    input: bytes,
-) -> bytes:
-    return input.strip().upper().encode()
-
-
-def truncate_bits(
-    checksums: dict[str, str], bits: int = default_bits
-) -> dict[str, str]:
+def truncate(checksums: dict[str, str], bits: int = default_bits) -> dict[str, str]:
     chars_to_keep = int(bits / 4)
     return {k: v[:chars_to_keep] for k, v in checksums.items()}
 
 
+def normalise(input: str) -> str:
+    return input.upper().replace("-", "")
+
+
 def sum_bytes(
-    input: bytes, alphabet: Alphabet = default_alphabet, bits: int = default_bits
+    input: bytes, alphabet: Alphabet | None = None, bits: int = default_bits
 ) -> str:
     if not set(input) <= alphabets[alphabet.name]:
-        raise AlphabetError("Error")
-    return truncate_bits(generate_checksum(input.encode()), bits=bits)
+        raise AlphabetError
+    return truncate(generate_checksum(input.encode()), bits=bits)
 
 
 def sum_file(
     input: Path,
-    alphabet: Alphabet = default_alphabet,
+    alphabet: Alphabet | None = None,
     bits: int = default_bits,
     stdout: bool = False,
 ) -> dict[str, str]:
@@ -67,21 +64,25 @@ def sum_file(
     validate_bits(bits)
     chars_to_keep = int(bits / 4)
     checksums = {}
-    for record in dnaio.open(str(input)):
-        checksums[record.name] = generate_checksum(record.sequence.encode())
+    # fa = pyfastx.Fasta(str(input), uppercase=True)
+    # print(fa.composition)
+    # print(dir(fa))
+    # for name, seq in fa:
+    for name, seq in pyfastx.Fasta(str(input), build_index=False, uppercase=True):
+        # for record in dnaio.open(str(input)):
+        #     name, seq = record.name, record.sequence
+
+        if alphabet and not set(seq) <= alphabets[alphabet.name]:
+            raise AlphabetError()
+        checksum = generate_checksum(seq.encode())
+        checksums[name] = checksum
         if stdout:
-            print(f"{record.name}\t{checksums[record.name][:chars_to_keep]}")
+            print(f"{name}\t{checksum[:chars_to_keep]}")
     if len(checksums) > 1:
         checksums["ALL"] = generate_checksum_of_checksums(checksums)
         if stdout:
             print(f"ALL\t{checksums['ALL'][:chars_to_keep]}")
-    return truncate_bits(checksums, bits=bits)
-
-    # for name, seq in pyfastx.Fasta(str(input), build_index=False):
-    #     checksums[name] = generate_checksum(seq.encode(), bits=bits)
-    #     if stdout:
-    #         print(f"{name}\t{checksums[name]}")
-    # return checksums
+    return truncate(checksums, bits=bits)
 
 
 def parse_fasta_from_stdin():
@@ -99,7 +100,7 @@ def parse_fasta_from_stdin():
 
 
 def sum_stdin(
-    alphabet: Alphabet = Alphabet.bio,
+    alphabet: Alphabet | None = None,
     bits: int = 64,
     stdout: bool = False,
 ) -> dict[str, str]:
@@ -108,14 +109,17 @@ def sum_stdin(
     chars_to_keep = int(bits / 4)
     checksums = {}
     for name, seq in parse_fasta_from_stdin():
-        checksums[name] = generate_checksum(seq.encode())
+        if alphabet and not set(seq) <= alphabets[alphabet.name]:
+            raise AlphabetError()
+        checksum = generate_checksum(normalise(seq).encode())
+        checksums[name] = checksum
         if stdout:
-            print(f"{name}\t{checksums[name][:chars_to_keep]}")
+            print(f"{name}\t{checksum[:chars_to_keep]}")
     if len(checksums) > 1:
         checksums["ALL"] = generate_checksum_of_checksums(checksums)
         if stdout:
             print(f"ALL\t{checksums['ALL'][:chars_to_keep]}")
-    return truncate_bits(checksums, bits=bits)
+    return truncate(checksums, bits=bits)
 
 
 def generate_checksum(input: bytes) -> str:
