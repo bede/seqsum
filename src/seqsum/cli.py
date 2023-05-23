@@ -9,18 +9,19 @@ from seqsum import lib
 def sum(
     input: Path,
     *,
-    alphabet: lib.Alphabet | None = None,
+    alphabet: lib.Alphabet_cli = lib.Alphabet_cli.bytes,
     bits: int = lib.default_bits,
     json: bool = False
 ):
     """
-    Generate checksum(s) for sequences contained in fasta/fastq[.gz|.bz2] files or stdin
+    Generate checksum(s) for sequences as fasta/fastq[.gz|.bz2] files or stdin
 
-    :arg input: path to fasta/fastq file (or - for stdin)
-    :arg alphabet: constrain input to a sequence alphabet
+    :arg input: path to fasta/q file (or - for stdin)
+    :arg alphabet: constraint for sequence alphabet
     :arg bits: displayed checksum length
     :arg json: output JSON
     """
+    alphabet = alphabet if alphabet != lib.Alphabet_cli.bytes else None
     if str(input) == "-":
         checksums = lib.sum_stdin(alphabet=alphabet, bits=bits, stdout=not json)
     else:

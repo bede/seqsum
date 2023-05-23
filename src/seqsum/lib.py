@@ -12,18 +12,26 @@ logging.basicConfig(format="%(levelname)s: %(message)s", level=logging.INFO)
 
 
 alphabets = {
-    # Includes "-" as optimisation; these are stripped prior to hashing
-    "nt": set("ABCDGHKMNRSTVWY") | set("-"),  # Bio.Alphabet.IUPAC.IUPACAmbiguousDNA
-    "aa": set("*ACDEFGHIKLMNPQRSTVWY")
-    | set("-"),  # Bio.Alphabet.IUPAC.ExtendedIUPACProtein
+    # Includes "-" as optimisation; stripped prior to hashing
+    "bytes": set(),  # Avoids a type union, makes CLI help more intuitive
+    "nt": set("ABCDGHKMNRSTVWY-"),  # Bio.Alphabet.IUPAC.IUPACAmbiguousDNA
+    "aa": set("*ACDEFGHIKLMNPQRSTVWY-"),  # Bio.Alphabet.IUPAC.ExtendedIUPACProtein
 }
-Alphabet = enum.Enum("Alphabet", list(alphabets.keys()))
-
+Alphabet = enum.Enum("Alphabet", [k for k in alphabets.keys() if k != "bytes"])
+Alphabet_cli = enum.Enum("Alphabet", list(alphabets.keys()))
 default_bits = 64
 
 
+class DuplicateNameError(Exception):
+    def __init__(self, names):
+        self.names = names
+
+    def __str__(self):
+        return f"Records contain duplicated names: {', '.join(self.names)}"
+
+
 class AlphabetError(Exception):
-    def __init__(self, message="Record(s) contain characters not in alphabet"):
+    def __init__(self, message="Records contain characters not in alphabet"):
         super().__init__(message)
 
 
@@ -33,7 +41,7 @@ class BitLengthError(Exception):
 
 
 def validate_bits(bits: int) -> None:
-    if not 4 < bits < 128 or bits % 4 != 0:
+    if not 4 <= bits <= 128 or bits % 4 != 0:
         raise BitLengthError
 
 
@@ -44,6 +52,24 @@ def truncate(checksums: dict[str, str], bits: int = default_bits) -> dict[str, s
 
 def normalise(input: str) -> str:
     return input.upper().replace("-", "")
+
+
+def detect_duplicate_names(duplicate_names: list) -> None:
+    if duplicate_names:
+        raise DuplicateNameError(duplicate_names)
+
+
+def detect_collisions(
+    checksums: dict[str, str], truncated_checksums: dict[str, str]
+) -> None:
+    unique_checksums = len(set(checksums.values()))
+    unique_truncated_checksums = len(set(truncated_checksums.values()))
+    duplicate_sequences = unique_checksums < len(checksums)
+    checksum_collisions = unique_truncated_checksums < unique_checksums
+    if duplicate_sequences:
+        logging.info("Found duplicate sequences")
+    if checksum_collisions:
+        logging.warning("Found checksum collisions. Consider increasing --bits")
 
 
 def sum_bytes(
@@ -63,6 +89,7 @@ def sum_file(
     logging.info(f"Using file {input}")
     validate_bits(bits)
     chars_to_keep = int(bits / 4)
+    duplicate_names = set()
     checksums = {}
     # fa = pyfastx.Fasta(str(input), uppercase=True)
     # print(fa.composition)
@@ -75,6 +102,8 @@ def sum_file(
         if alphabet and not set(seq) <= alphabets[alphabet.name]:
             raise AlphabetError()
         checksum = generate_checksum(seq.encode())
+        if name in checksums:
+            duplicate_names.add(name)
         checksums[name] = checksum
         if stdout:
             print(f"{name}\t{checksum[:chars_to_keep]}")
@@ -82,7 +111,10 @@ def sum_file(
         checksums["ALL"] = generate_checksum_of_checksums(checksums)
         if stdout:
             print(f"ALL\t{checksums['ALL'][:chars_to_keep]}")
-    return truncate(checksums, bits=bits)
+    truncated_checksums = truncate(checksums, bits=bits)
+    detect_duplicate_names(duplicate_names)
+    detect_collisions(checksums, truncated_checksums)
+    return truncated_checksums
 
 
 def parse_fasta_from_stdin():
@@ -107,11 +139,14 @@ def sum_stdin(
     logging.info("Using stdin")
     validate_bits(bits)
     chars_to_keep = int(bits / 4)
+    duplicate_names = set()
     checksums = {}
     for name, seq in parse_fasta_from_stdin():
         if alphabet and not set(seq) <= alphabets[alphabet.name]:
             raise AlphabetError()
         checksum = generate_checksum(normalise(seq).encode())
+        if name in checksums:
+            duplicate_names.add(name)
         checksums[name] = checksum
         if stdout:
             print(f"{name}\t{checksum[:chars_to_keep]}")
@@ -119,7 +154,10 @@ def sum_stdin(
         checksums["ALL"] = generate_checksum_of_checksums(checksums)
         if stdout:
             print(f"ALL\t{checksums['ALL'][:chars_to_keep]}")
-    return truncate(checksums, bits=bits)
+    truncated_checksums = truncate(checksums, bits=bits)
+    warn_duplicate_names(duplicate_names)
+    warn_collisions(checksums, truncated_checksums)
+    return truncated_checksums
 
 
 def generate_checksum(input: bytes) -> str:

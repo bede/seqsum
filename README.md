@@ -29,17 +29,21 @@ pytest
 
 ```
 % seqsum --help
-usage: seqsum [-h] [-f FUNCTION] [--version] input
+usage: seqsum [-h] [-a {bytes,nt,aa}] [-b BITS] [-j] [--version] input
 
-Generate a checksum from the supplied string or path
+Generate checksum(s) for sequences contained in fasta/fastq[.gz|.bz2] files or stdin
 
 positional arguments:
-  input                 string or path of input
+  input                 path to fasta/q file (or - for stdin)
 
 options:
   -h, --help            show this help message and exit
-  -f FUNCTION, --function FUNCTION
-                        hash
-                        (default: xxh128)
+  -a {bytes,nt,aa}, --alphabet {bytes,nt,aa}
+                        constraint for sequence alphabet
+                        (default: bytes)
+  -b BITS, --bits BITS  displayed checksum length
+                        (default: 64)
+  -j, --json            output JSON
+                        (default: False)
   --version             show program's version number and exit
 ```
