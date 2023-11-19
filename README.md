@@ -1,8 +1,8 @@
-[![Tests](https://github.com/bede/seqsum/actions/workflows/test.yml/badge.svg)](https://github.com/pha4ge/primaschema/actions/workflows/test.yml)
+[![Tests](https://github.com/bede/seqsum/actions/workflows/test.yml/badge.svg)](https://github.com/bede/seqsum/actions/workflows/test.yml)
 
 # Seqsum
 
-Checksums for biological sequences. Under development.
+Generates record-level checksums for biological sequences, ignoring record IDs. Checksums are generated for each record and  Also generates checksums for sets of records  Performs no normalisation or validation by default, but may be constrained to nucleotide or amino acid alphabets. Generates checksums for each record in a FASTA/FASTQ file and finally a checksum of checksum . Warns about duplicates and hash collisions by default.
 
 
 
@@ -31,7 +31,7 @@ pytest
 % seqsum --help
 usage: seqsum [-h] [-a {bytes,nt,aa}] [-b BITS] [-j] [--version] input
 
-Generate checksum(s) for sequences contained in fasta/fastq[.gz|.bz2] files or stdin
+Generate checksum(s) for sequences contained in fasta/fastq[.gz|.zst|.xz|.bz2] files or stdin
 
 positional arguments:
   input                 path to fasta/q file (or - for stdin)

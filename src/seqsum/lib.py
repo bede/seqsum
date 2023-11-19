@@ -1,25 +1,31 @@
 import enum
 import logging
+import re
 import sys
-from pathlib import Path
 
 import dnaio
-import pyfastx
 import xxhash
 
+from pathlib import Path
+from typing import Literal
+
+from tqdm import tqdm
 
 logging.basicConfig(format="%(levelname)s: %(message)s", level=logging.INFO)
 
 
 alphabets = {
     # Includes "-" as optimisation; stripped prior to hashing
-    "bytes": set(),  # Avoids a type union, makes CLI help more intuitive
+    "none": None,  # Avoids a type union, makes CLI help more intuitive
     "nt": set("ABCDGHKMNRSTVWY-"),  # Bio.Alphabet.IUPAC.IUPACAmbiguousDNA
     "aa": set("*ACDEFGHIKLMNPQRSTVWY-"),  # Bio.Alphabet.IUPAC.ExtendedIUPACProtein
 }
-Alphabet = enum.Enum("Alphabet", [k for k in alphabets.keys() if k != "bytes"])
+Alphabet = enum.Enum("Alphabet", [k for k in alphabets.keys() if k != "none"])
 Alphabet_cli = enum.Enum("Alphabet", list(alphabets.keys()))
 default_bits = 64
+
+normalise_to_t = str.maketrans("U", "T")
+normalise_to_n = re.compile(r"[^BDHKMRSVWY]")
 
 
 class DuplicateNameError(Exception):
@@ -27,11 +33,11 @@ class DuplicateNameError(Exception):
         self.names = names
 
     def __str__(self):
-        return f"Records contain duplicated names: {', '.join(self.names)}"
+        return f"Record contains duplicated names: {', '.join(self.names)}"
 
 
 class AlphabetError(Exception):
-    def __init__(self, message="Records contain characters not in alphabet"):
+    def __init__(self, message="Record contains characters not in alphabet"):
         super().__init__(message)
 
 
@@ -72,36 +78,31 @@ def detect_collisions(
         logging.warning("Found checksum collisions. Consider increasing --bits")
 
 
-def sum_bytes(
-    input: bytes, alphabet: Alphabet | None = None, bits: int = default_bits
-) -> str:
-    if not set(input) <= alphabets[alphabet.name]:
-        raise AlphabetError
-    return truncate(generate_checksum(input.encode()), bits=bits)
-
-
 def sum_file(
     input: Path,
+    normalise: bool = False,
     alphabet: Alphabet | None = None,
     bits: int = default_bits,
     stdout: bool = False,
 ) -> dict[str, str]:
-    logging.info(f"Using file {input}")
     validate_bits(bits)
     chars_to_keep = int(bits / 4)
     duplicate_names = set()
     checksums = {}
-    # fa = pyfastx.Fasta(str(input), uppercase=True)
-    # print(fa.composition)
-    # print(dir(fa))
-    # for name, seq in fa:
-    for name, seq in pyfastx.Fasta(str(input), build_index=False, uppercase=True):
-        # for record in dnaio.open(str(input)):
-        #     name, seq = record.name, record.sequence
 
-        if alphabet and not set(seq) <= alphabets[alphabet.name]:
+    # fa = pyfastx.Fasta(str(input), uppercase=True)
+    # for name, seq in fa:
+    # for name, seq in pyfastx.Fasta(str(input), build_index=False, uppercase=True):
+    # for record in parse_fastx_file(str(input)):
+    #     name, seq = record.id, record.seq
+
+    alphabet_chars = alphabets[alphabet.name] if alphabet else None
+    for record in dnaio.open(input, open_threads=1):
+        name, seq = record.name, record.sequence
+        seq_chars = set(seq.upper())
+        if alphabet and not seq_chars <= alphabet_chars:
             raise AlphabetError()
-        checksum = generate_checksum(seq.encode())
+        checksum = generate_checksum(seq, normalise=normalise)
         if name in checksums:
             duplicate_names.add(name)
         checksums[name] = checksum
@@ -141,10 +142,12 @@ def sum_stdin(
     chars_to_keep = int(bits / 4)
     duplicate_names = set()
     checksums = {}
+    alphabet_chars = alphabets.get(alphabet.name)
     for name, seq in parse_fasta_from_stdin():
-        if alphabet and not set(seq) <= alphabets[alphabet.name]:
+        seq_chars = set(seq)
+        if alphabet and not seq_chars <= alphabet_chars:
             raise AlphabetError()
-        checksum = generate_checksum(normalise(seq).encode())
+        checksum = generate_checksum(seq)
         if name in checksums:
             duplicate_names.add(name)
         checksums[name] = checksum
@@ -155,14 +158,23 @@ def sum_stdin(
         if stdout:
             print(f"ALL\t{checksums['ALL'][:chars_to_keep]}")
     truncated_checksums = truncate(checksums, bits=bits)
-    warn_duplicate_names(duplicate_names)
-    warn_collisions(checksums, truncated_checksums)
+    detect_duplicate_names(duplicate_names)
+    detect_collisions(checksums, truncated_checksums)
     return truncated_checksums
 
 
-def generate_checksum(input: bytes) -> str:
-    hex_digest = xxhash.xxh3_128(input).hexdigest()
-    return hex_digest
+def normalise(string: str, alphabet: Literal["nt", "aa"]) -> str:
+    if alphabet == "nt":
+        return normalise_to_n.sub("N", string.upper().translate(normalise_to_t))
+    elif alphabet == "aa":
+        return normalise_to_n.sub("N", string.upper())
+    else:
+        raise ValueError(f"Unknown alphabet: {alphabet}")
+
+
+def generate_checksum(string: str, normalise: bool = False) -> str:
+    # if normalise:
+    return xxhash.xxh3_128(string.upper().encode()).hexdigest()
 
 
 def generate_checksum_of_checksums(checksums: dict[str, str]) -> str:
