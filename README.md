@@ -1,4 +1,4 @@
-[![Tests](https://github.com/bede/seqsum/actions/workflows/test.yml/badge.svg)](https://github.com/bede/seqsum/actions/workflows/test.yml)
+[![Tests](https://github.com/bede/seqsum/actions/workflows/test.yml/badge.svg)](https://github.com/bede/seqsum/actions/workflows/test.yml) [![PyPI version](https://img.shields.io/pypi/v/seqsum)](https://pypi.org/project/seqsum)
 
 # Seqsum
 

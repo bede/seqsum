@@ -1,2 +1,2 @@
-"""Collision-free checksums for nucleotide sequence collections"""
-__version__ = "0.1.0"
+"""Robust individual and aggregate checksums for nucleotide sequences"""
+__version__ = "0.1.1"
