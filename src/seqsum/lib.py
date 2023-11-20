@@ -1,4 +1,3 @@
-import enum
 import logging
 import re
 import sys
@@ -7,21 +6,17 @@ import dnaio
 import xxhash
 
 from pathlib import Path
-from typing import Literal
 
 from tqdm import tqdm
+
 
 logging.basicConfig(format="%(levelname)s: %(message)s", level=logging.INFO)
 
 
-alphabets = {
-    # Includes "-" as optimisation; stripped prior to hashing
-    "none": None,  # Avoids a type union, makes CLI help more intuitive
-    "nt": set("ABCDGHKMNRSTVWY-"),  # Bio.Alphabet.IUPAC.IUPACAmbiguousDNA
-    "aa": set("*ACDEFGHIKLMNPQRSTVWY-"),  # Bio.Alphabet.IUPAC.ExtendedIUPACProtein
-}
-Alphabet = enum.Enum("Alphabet", [k for k in alphabets.keys() if k != "none"])
-Alphabet_cli = enum.Enum("Alphabet", list(alphabets.keys()))
+nt_alphabet = (set("ABCDGHKMNRSTVWY-"),)  # Bio.Alphabet.IUPAC.IUPACAmbiguousDNA
+aa_alphabet = (
+    set("*ACDEFGHIKLMNPQRSTVWY-"),
+)  # Bio.Alphabet.IUPAC.ExtendedIUPACProtein
 default_bits = 64
 
 normalise_to_t = str.maketrans("U", "T")
@@ -33,11 +28,11 @@ class DuplicateNameError(Exception):
         self.names = names
 
     def __str__(self):
-        return f"Record contains duplicated names: {', '.join(self.names)}"
+        return f"Sequence contains duplicated names: {', '.join(self.names)}"
 
 
 class AlphabetError(Exception):
-    def __init__(self, message="Record contains characters not in alphabet"):
+    def __init__(self, message="Sequence contains characters not in alphabet"):
         super().__init__(message)
 
 
@@ -54,10 +49,6 @@ def validate_bits(bits: int) -> None:
 def truncate(checksums: dict[str, str], bits: int = default_bits) -> dict[str, str]:
     chars_to_keep = int(bits / 4)
     return {k: v[:chars_to_keep] for k, v in checksums.items()}
-
-
-def normalise(input: str) -> str:
-    return input.upper().replace("-", "")
 
 
 def detect_duplicate_names(duplicate_names: list) -> None:
@@ -78,44 +69,42 @@ def detect_collisions(
         logging.warning("Found checksum collisions. Consider increasing --bits")
 
 
-def sum_file(
+def sum_nt(
     input: Path,
     normalise: bool = False,
-    alphabet: Alphabet | None = None,
+    strict: bool = False,
     bits: int = default_bits,
-    stdout: bool = False,
-) -> dict[str, str]:
+    progress: bool = True,
+) -> tuple[dict[str, str], str | None]:
     validate_bits(bits)
     chars_to_keep = int(bits / 4)
     duplicate_names = set()
     checksums = {}
-
-    # fa = pyfastx.Fasta(str(input), uppercase=True)
-    # for name, seq in fa:
-    # for name, seq in pyfastx.Fasta(str(input), build_index=False, uppercase=True):
-    # for record in parse_fastx_file(str(input)):
-    #     name, seq = record.id, record.seq
-
-    alphabet_chars = alphabets[alphabet.name] if alphabet else None
-    for record in dnaio.open(input, open_threads=1):
+    checksum_of_checksums = None
+    for record in tqdm(
+        dnaio.open(input, open_threads=1),
+        bar_format="Processed {n} record(s) ({rate_fmt})",
+        disable=not progress,
+        mininterval=0.25,
+        unit_scale=True,
+        leave=True,
+    ):
         name, seq = record.name, record.sequence
         seq_chars = set(seq.upper())
-        if alphabet and not seq_chars <= alphabet_chars:
+        if strict and not seq_chars <= nt_alphabet:
             raise AlphabetError()
         checksum = generate_checksum(seq, normalise=normalise)
         if name in checksums:
             duplicate_names.add(name)
         checksums[name] = checksum
-        if stdout:
-            print(f"{name}\t{checksum[:chars_to_keep]}")
     if len(checksums) > 1:
-        checksums["ALL"] = generate_checksum_of_checksums(checksums)
-        if stdout:
-            print(f"ALL\t{checksums['ALL'][:chars_to_keep]}")
+        checksum_of_checksums = generate_checksum_of_checksums(checksums)[
+            :chars_to_keep
+        ]
     truncated_checksums = truncate(checksums, bits=bits)
     detect_duplicate_names(duplicate_names)
     detect_collisions(checksums, truncated_checksums)
-    return truncated_checksums
+    return truncated_checksums, checksum_of_checksums
 
 
 def parse_fasta_from_stdin():
@@ -132,48 +121,44 @@ def parse_fasta_from_stdin():
         yield (name, "".join(sequence))
 
 
-def sum_stdin(
-    alphabet: Alphabet | None = None,
-    bits: int = 64,
-    stdout: bool = False,
-) -> dict[str, str]:
-    logging.info("Using stdin")
-    validate_bits(bits)
-    chars_to_keep = int(bits / 4)
-    duplicate_names = set()
-    checksums = {}
-    alphabet_chars = alphabets.get(alphabet.name)
-    for name, seq in parse_fasta_from_stdin():
-        seq_chars = set(seq)
-        if alphabet and not seq_chars <= alphabet_chars:
-            raise AlphabetError()
-        checksum = generate_checksum(seq)
-        if name in checksums:
-            duplicate_names.add(name)
-        checksums[name] = checksum
-        if stdout:
-            print(f"{name}\t{checksum[:chars_to_keep]}")
-    if len(checksums) > 1:
-        checksums["ALL"] = generate_checksum_of_checksums(checksums)
-        if stdout:
-            print(f"ALL\t{checksums['ALL'][:chars_to_keep]}")
-    truncated_checksums = truncate(checksums, bits=bits)
-    detect_duplicate_names(duplicate_names)
-    detect_collisions(checksums, truncated_checksums)
-    return truncated_checksums
+# def sum_stdin(
+#     alphabet: Alphabet | None = None,
+#     bits: int = 64,
+#     stdout: bool = False,
+# ) -> dict[str, str]:
+#     logging.info("Using stdin")
+#     validate_bits(bits)
+#     chars_to_keep = int(bits / 4)
+#     duplicate_names = set()
+#     checksums = {}
+#     alphabet_chars = alphabets.get(alphabet.name)
+#     for name, seq in parse_fasta_from_stdin():
+#         seq_chars = set(seq)
+#         if alphabet and not seq_chars <= alphabet_chars:
+#             raise AlphabetError()
+#         checksum = generate_checksum(seq)
+#         if name in checksums:
+#             duplicate_names.add(name)
+#         checksums[name] = checksum
+#         if stdout:
+#             print(f"{name}\t{checksum[:chars_to_keep]}")
+#     if len(checksums) > 1:
+#         checksums["ALL"] = generate_checksum_of_checksums(checksums)
+#         if stdout:
+#             print(f"ALL\t{checksums['ALL'][:chars_to_keep]}")
+#     truncated_checksums = truncate(checksums, bits=bits)
+#     detect_duplicate_names(duplicate_names)
+#     detect_collisions(checksums, truncated_checksums)
+#     return truncated_checksums
 
 
-def normalise(string: str, alphabet: Literal["nt", "aa"]) -> str:
-    if alphabet == "nt":
-        return normalise_to_n.sub("N", string.upper().translate(normalise_to_t))
-    elif alphabet == "aa":
-        return normalise_to_n.sub("N", string.upper())
-    else:
-        raise ValueError(f"Unknown alphabet: {alphabet}")
+def normalise_nt(string: str) -> str:
+    return normalise_to_n.sub("N", string.upper().translate(normalise_to_t))
 
 
 def generate_checksum(string: str, normalise: bool = False) -> str:
-    # if normalise:
+    if normalise:
+        string = normalise_nt(string)
     return xxhash.xxh3_128(string.upper().encode()).hexdigest()
 
 

@@ -1,2 +1,2 @@
-"""Test"""
-__version__ = "0.0.1"
+"""Collision-free checksums for nucleotide sequence collections"""
+__version__ = "0.1.0"

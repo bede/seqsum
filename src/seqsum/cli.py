@@ -6,34 +6,42 @@ import defopt
 from seqsum import lib
 
 
-def sum(
+def nt(
     input: Path,
     *,
     normalise: bool = False,
-    alphabet: lib.Alphabet_cli = lib.Alphabet_cli.none,
+    strict: bool = False,
     bits: int = lib.default_bits,
-    json: bool = False
+    json: bool = False,
+    progress: bool = True,
 ):
     """
-    Generate checksum(s) for sequences as fasta/fastq[.gz|.bz2] files or stdin.
-    Automatically warns of duplicate sequences and checksum collisions.
+    Robust individual and collective checksums for nucleotide sequences. Accepts input
+    from stdin or fast[a|q][.gz|.zst|.xz|.bz2] files. Generates checksums for each
+    sequence, and a checksum of checksums given multiple records. Warnings are shown
+    for duplicate sequences and within-collection checksum collisions at the chosen
+    bit depth. Sequences are uppercased before hashing with xxh3_128 and may
+    optionally be normalised to contain only the characters ACGTN-
 
     :arg input: path to fasta/q file (or - for stdin)
-    :arg normalise: Replace non ACGT- characters with N
+    :arg normalise: replace U with T and characters other than ACGT- with N
+    :arg strict: raise error for characters other than ABCDGHKMNRSTVWY-
     :arg alphabet: constraint for sequence alphabet
     :arg bits: displayed checksum length
     :arg json: output JSON
+    :arg progress: show progress and speed
     """
-    alphabet = alphabet if alphabet != lib.Alphabet_cli.none else None
-    if str(input) == "-":
-        checksums = lib.sum_stdin(alphabet=alphabet, bits=bits, stdout=not json)
-    else:
-        checksums = lib.sum_file(
-            input, normalise=normalise, alphabet=alphabet, bits=bits, stdout=not json
-        )
+    checksums, checksum_of_checksums = lib.sum_nt(
+        input, normalise=normalise, strict=strict, bits=bits, progress=progress
+    )
+    if checksum_of_checksums:
+        checksums["sum-of-sums"] = checksum_of_checksums  # Combine for printing
     if json:
         print(json_.dumps(checksums, indent=4))
+    else:
+        for k, v in checksums.items():
+            print(f"{k}\t{v}")
 
 
 def main():
-    defopt.run(sum, no_negated_flags=True)
+    defopt.run({"nt": nt}, no_negated_flags=True)
