@@ -4,7 +4,7 @@
 
 Robust individual and collective checksums for nucleotide sequences. Accepts input from stdin or `fast[a|q][.gz|.zst|.xz|.bz2]` files. Generates checksums for each sequence, and a checksum of checksums given multiple records. Warnings are shown for duplicate sequences and within-collection checksum collisions at the chosen bit depth. Sequences are uppercased before hashing with `xxh3_128` and may optionally be normalised to contain only the characters `ACGTN-`.
 
-
+The typical use case is determining whether reordered, renamed or otherwise bit-inexact fasta/fastq files are equivalent in their sequence composition.
 
 ## Install (Python 3.10+)
 
