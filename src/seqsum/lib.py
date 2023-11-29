@@ -63,7 +63,7 @@ def detect_collisions(
     if duplicate_sequences:
         logging.info("Found duplicate sequences")
     if checksum_collisions:
-        logging.warning("Found checksum collisions. Consider increasing --bits")
+        logging.warning("Found checksum collisions, consider increasing --bits")
 
 
 def sum_nt(
@@ -78,8 +78,9 @@ def sum_nt(
     duplicate_names = set()
     checksums = {}
     aggregate_checksum = None
+    # if type(input) == Path
     if not Path(input).is_file():
-        logging.info("Invalid path, treating as string input")
+        logging.info("Input is not a valid path, treating as string")
         input = io.BytesIO(input.encode())
     for record in tqdm(
         dnaio.open(input, open_threads=1),
@@ -94,8 +95,9 @@ def sum_nt(
         if strict and not seq_chars <= nt_alphabet:
             raise AlphabetError()
         if normalise:
+            # logging.info(f"{seq=}")
             seq = normalise_nt(seq)
-            logging.info(f"normalised sequence {seq}")
+            # logging.info(f"normalised sequence {seq}")
         checksum = generate_checksum(seq)
         if name in checksums:
             duplicate_names.add(name)
@@ -109,10 +111,13 @@ def sum_nt(
 
 
 def normalise_nt(string: str) -> str:
+    normalise_to_t = str.maketrans("U", "T")
+    normalise_to_n = re.compile(r"[^ACGT-]")
     return normalise_to_n.sub("N", string.upper().translate(normalise_to_t))
 
 
 def generate_checksum(string: str) -> str:
+    # logging.info(f"{string=}")
     return xxhash.xxh3_128(string.upper().encode()).hexdigest()
 
 

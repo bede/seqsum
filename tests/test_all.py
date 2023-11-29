@@ -26,3 +26,10 @@ def test_sars2_xxh128():
         {"MN908947.3": "ca5e95436b957f93"},
         None,
     )
+
+
+def test_normlise():
+    result = lib.sum_nt("tests/data/normalise-test.fasta", normalise=True)
+    assert result == (
+        ({"t1": "1676bc5970afaf54", "t2": "1676bc5970afaf54"}, "b29e3982cfea538e")
+    )

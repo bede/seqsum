@@ -1,6 +1,5 @@
 import json as json_
 from pathlib import Path
-from typing import Literal
 
 import defopt
 
@@ -13,9 +12,11 @@ def nt(
     normalise: bool = False,
     strict: bool = False,
     bits: int = lib.default_bits,
-    output: Literal["individual", "aggregate", "both"] = "both",
+    # output: Literal["individual", "aggregate", "both"] = "both",
+    individual: bool = False,
+    aggregate: bool = False,
     json: bool = False,
-    progress: bool = True,
+    progress: bool = False,
 ):
     """
     Robust individual and aggregate checksums for nucleotide sequences. Accepts input
@@ -31,21 +32,22 @@ def nt(
     :arg strict: raise error for characters other than ABCDGHKMNRSTVWY-
     :arg alphabet: constraint for sequence alphabet
     :arg bits: displayed checksum length
-    :arg output: output individual checksums, the aggregate checksum, or both
+    :arg individual: output only individual checksums
+    :arg aggregate: output only aggregate checksum
     :arg json: output JSON
     :arg progress: show progress and speed
     """
     checksums, aggregate_checksum = lib.sum_nt(
         input, normalise=normalise, strict=strict, bits=bits, progress=progress
     )
-    if output == "individual":
+    if individual and not aggregate:
         pass
-    elif output == "aggregate":
+    elif aggregate and not individual:
         if aggregate_checksum:
             checksums = {"aggregate": aggregate_checksum}
         else:
             raise ValueError("Aggregate checksum unavailable")
-    else:  # output == "both"
+    else:
         if aggregate_checksum:
             if "aggregate" not in checksums:
                 checksums["aggregate"] = aggregate_checksum
@@ -59,4 +61,4 @@ def nt(
 
 
 def main():
-    defopt.run({"nt": nt}, no_negated_flags=True, short={})
+    defopt.run({"nt": nt}, no_negated_flags=True)
