@@ -93,3 +93,11 @@ checksums, aggregate_checksum = lib.sum_nt(fasta_contents)
 print(checksums)
 ```
 
+```python
+from pathlib import Path
+from seqsum import lib
+
+checksums, aggregate_checksum = lib.sum_nt(Path("tests/data/MN908947-BA_2_86_1.fasta"))
+print(checksums, aggregate_checksum)
+```
+

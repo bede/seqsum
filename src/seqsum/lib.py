@@ -80,8 +80,11 @@ def sum_nt(
     aggregate_checksum = None
     # if type(input) == Path
     if not Path(input).is_file():
-        logging.info("Input is not a valid path, treating as string")
-        input = io.BytesIO(input.encode())
+        if isinstance(input, Path):
+            raise FileNotFoundError(f"Invalid input path: {input}")
+        else:
+            logging.info("Input is not a valid path, treating as string")
+            input = io.BytesIO(input.encode())
     for record in tqdm(
         dnaio.open(input, open_threads=1),
         bar_format="Processed {n} record(s) ({rate_fmt})",

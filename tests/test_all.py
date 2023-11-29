@@ -1,5 +1,8 @@
 import subprocess
+
 from pathlib import Path
+
+import pytest
 
 from seqsum import lib
 
@@ -33,3 +36,8 @@ def test_normlise():
     assert result == (
         ({"t1": "1676bc5970afaf54", "t2": "1676bc5970afaf54"}, "b29e3982cfea538e")
     )
+
+
+def test_invalid_input_path():
+    with pytest.raises(FileNotFoundError):
+        lib.sum_nt(Path("tests/data/non-existent.fasta"))
