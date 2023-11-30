@@ -2,9 +2,11 @@
 
 # Seqsum
 
-Robust individual and aggregate checksums for nucleotide sequences. Accepts data from either standard input or `fast[a|q][.gz|.zst|.xz|.bz2]` files. Generates *individual* checksums for each sequence, and an *aggregate* checksum-of-checksums for a collection of sequences. Warnings are shown for duplicate sequences and within-collection checksum collisions at the chosen bit depth. Sequences are uppercased prior to hashing with [xxHash](https://github.com/ifduyue/python-xxhash) (`xxh3_128`) and may optionally be normalised (with `-n`) to use only the characters `ACGTN-`. Read IDs and base quality scores do not inform the checksum. Outputs TSV or JSON to stdout.
+Robust checksums for nucleotide sequences. Accepts data from either standard input or `fast[a|q][.gz|.zst|.xz|.bz2]` files. Generates *individual* checksums for each sequence, and an *aggregate* checksum-of-checksums for a collection of sequences. Warnings are shown for duplicate sequences and within-collection checksum collisions at the chosen bit depth. Sequences are uppercased prior to hashing with [xxHash](https://github.com/ifduyue/python-xxhash) (`xxh3_128`) and may be normalised (with `-n`) to use only the characters `ACGTN-`. Read IDs and FASTQ base quality scores do not inform the checksum. Outputs TSV or JSON to stdout.
 
 A typical use case is for determining whether reordered, renamed or otherwise bit-inexact fasta/fastq files have equivalent sequence composition. Another use is generating the shortest possible collision-free identifiers for sequence collections.
+
+By default, seqsum outputs both individual and aggregate checksums when supplied with more than one sequence. This can be modified with the flags `--individual` (`-i`) or `--aggregate` (`-a`).
 
 ## Install (Python 3.10+)
 
@@ -36,6 +38,10 @@ MN908947.3	ca5e95436b957f93
 $ seqsum nt MN908947-BA_2_86_1.fasta
 MN908947.3	ca5e95436b957f93
 BA.2.86.1		d5f014ee6745cb77
+aggregate	837cfd6836b9a406
+
+# Fasta with two records, only show the aggregate checksum
+$ seqsum nt -a MN908947-BA_2_86_1.fasta
 aggregate	837cfd6836b9a406
 
 # Fastq (gzipped) with 1m records, redirected to file, with progress bar
