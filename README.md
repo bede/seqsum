@@ -8,17 +8,21 @@ A typical use case is for determining whether reordered, renamed or otherwise bi
 
 By default, seqsum outputs both individual and aggregate checksums when supplied with more than one sequence. This can be modified with the flags `--individual` (`-i`) or `--aggregate` (`-a`).
 
-## Install (Python 3.10+)
+
+
+## Install
+
+Installation inside a clean Python 3.10+ virtualenv (or conda environment) is recommended. To open `.zst` archives, you will also need to`pip install zstandard`.
 
 ```bash
-# Latest release
 pip install seqsum
+```
 
-# Latest commit
-git clone https://github.com/bede/seqsum
-pip install ./seqsum
 
-# Development
+
+**Development install**
+
+```# Development
 git clone https://github.com/bede/seqsum.git
 cd seqsum
 pip install --editable '.[dev]'
@@ -27,7 +31,7 @@ pytest
 
 
 
-## CLI usage
+## Command line usage
 
 ```bash
 # Fasta with one record
@@ -53,6 +57,8 @@ INFO: Found duplicate sequences
 % cat MN908947.fasta | seqsum nt -
 MN908947.3	ca5e95436b957f93
 ```
+
+**Built-in help**
 
 ```bash
 $ seqsum nt -h                       
