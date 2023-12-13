@@ -5,6 +5,8 @@ from pathlib import Path
 
 import pytest
 
+import dnaio
+
 from seqsum import lib
 
 data_dir = Path("tests/data")
@@ -47,20 +49,20 @@ def test_multiple_records_cli():
 
 
 def test_normalise():
-    result = lib.sum_nt("tests/data/normalise.fasta", normalise=True)
+    result = lib.sum_nt(Path("tests/data/normalise.fasta"), normalise=True)
     assert result == (
         ({"t1": "1676bc5970afaf54", "t2": "1676bc5970afaf54"}, "b29e3982cfea538e")
     )
 
 
 def test_strict_pass():
-    result = lib.sum_nt("tests/data/strict-pass.fasta", strict=True)
+    result = lib.sum_nt(Path("tests/data/strict-pass.fasta"), strict=True)
     assert result == (({"pass": "a727e12ce46c16e3"}, None))
 
 
 def test_exc_strict_fail():
     with pytest.raises(lib.AlphabetError):
-        lib.sum_nt("tests/data/strict-fail.fasta", strict=True)
+        lib.sum_nt(Path("tests/data/strict-fail.fasta"), strict=True)
 
 
 def test_exc_invalid_path():
@@ -68,19 +70,24 @@ def test_exc_invalid_path():
         lib.sum_nt(Path("tests/data/non-existent.fasta"))
 
 
+def test_exc_invalid_string_input():
+    with pytest.raises(dnaio.exceptions.UnknownFileFormat):
+        lib.sum_nt("<invalid fasta\nACGT")
+
+
 def test_exc_duplicate_names():
     with pytest.raises(lib.DuplicateNameError):
-        lib.sum_nt("tests/data/duplicate-names.fasta", strict=True)
+        lib.sum_nt(Path("tests/data/duplicate-names.fasta"), strict=True)
 
 
 def test_exc_invalid_bit_depth():
     with pytest.raises(lib.BitDepthError):
-        lib.sum_nt("tests/data/MN908947.fasta", bits=9)
+        lib.sum_nt(Path("tests/data/MN908947.fasta"), bits=9)
 
 
 def test_logging_duplicate_sequences(caplog):
     with caplog.at_level(logging.INFO):
-        lib.sum_nt("tests/data/duplicate-sequences.fasta")
+        lib.sum_nt(Path("tests/data/duplicate-sequences.fasta"))
         found = False
         for record in caplog.records:
             print(record)
@@ -91,7 +98,7 @@ def test_logging_duplicate_sequences(caplog):
 
 def test_logging_collisions(caplog):
     with caplog.at_level(logging.WARNING):
-        lib.sum_nt("tests/data/collision.fasta", bits=4)
+        lib.sum_nt(Path("tests/data/collision.fasta"), bits=4)
         found = False
         for record in caplog.records:
             print(record)

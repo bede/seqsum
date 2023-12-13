@@ -100,23 +100,20 @@ options:
 ```python
 from seqsum import lib
 
-fasta_contents = ">read1\nACGT"
-checksums, aggregate_checksum = lib.sum_nt(fasta_contents)
+checksums, aggregate_checksum = lib.sum_nt(">read1\nACGT")
 print(checksums)
+# {'read1': '81db282b97e7dfd1'}
 ```
 
 ```python
 from pathlib import Path
 from seqsum import lib
 
-checksums, aggregate_checksum = lib.sum_nt(Path("tests/data/MN908947-BA_2_86_1.fasta"))
-print(checksums, aggregate_checksum)
-# (
-#     {
-#         "MN908947.3": "ca5e95436b957f93",
-#         "BA.2.86.1": "d5f014ee6745cb77",
-#     },
-#     "837cfd6836b9a406",
-# )
+fasta_path = Path("tests/data/MN908947-BA_2_86_1.fasta")
+checksums, aggregate_checksum = lib.sum_nt(fasta_path)
+print(checksums)
+print(aggregate_checksum)
+# {'MN908947.3': 'ca5e95436b957f93', 'BA.2.86.1': 'd5f014ee6745cb77'}
+# 837cfd6836b9a406
 ```
 
