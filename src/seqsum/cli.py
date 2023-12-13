@@ -12,7 +12,6 @@ def nt(
     normalise: bool = False,
     strict: bool = False,
     bits: int = lib.default_bits,
-    # output: Literal["individual", "aggregate", "both"] = "both",
     individual: bool = False,
     aggregate: bool = False,
     json: bool = False,
@@ -32,8 +31,8 @@ def nt(
     :arg strict: raise error for characters other than ABCDGHKMNRSTVWY-
     :arg alphabet: constraint for sequence alphabet
     :arg bits: displayed checksum length
-    :arg individual: output only individual checksums
-    :arg aggregate: output only aggregate checksum
+    :arg individual: output individual checksums only
+    :arg aggregate: output aggregate checksum only
     :arg json: output JSON
     :arg progress: show progress and speed
     """

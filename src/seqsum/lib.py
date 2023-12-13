@@ -33,14 +33,14 @@ class AlphabetError(Exception):
         super().__init__(message)
 
 
-class BitLengthError(Exception):
+class BitDepthError(Exception):
     def __init__(self, message="Bit depth must be a multiple of 4 between 4 and 128"):
         super().__init__(message)
 
 
 def validate_bits(bits: int) -> None:
     if not 4 <= bits <= 128 or bits % 4 != 0:
-        raise BitLengthError
+        raise BitDepthError
 
 
 def truncate(checksums: dict[str, str], bits: int = default_bits) -> dict[str, str]:
