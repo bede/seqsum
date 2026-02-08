@@ -8,6 +8,8 @@ A typical use case is determining whether reordered, renamed or otherwise bit-in
 
 By default, seqsum outputs both individual and aggregate checksums when supplied with more than one sequence. This can be modified with the flags `--individual` (`-i`) or `--aggregate` (`-a`).
 
+Uses the excellent library [`dnaio`](https://github.com/marcelm/dnaio) efficient sequence parsing.
+
 
 
 ## Install
@@ -20,13 +22,17 @@ pip install seqsum
 
 
 
-**Development install**
+## Development
 
-```# Development
+Development uses [uv](https://docs.astral.sh/uv/).
+
+```bash
 git clone https://github.com/bede/seqsum.git
 cd seqsum
-pip install --editable '.[dev]'
-pytest
+uv sync
+uv run pytest
+uv run pre-commit install
+uv run pre-commit run --all-files
 ```
 
 
@@ -41,7 +47,7 @@ MN908947.3	ca5e95436b957f93
 # Fasta with two records
 $ seqsum nt MN908947-BA_2_86_1.fasta
 MN908947.3	ca5e95436b957f93
-BA.2.86.1		d5f014ee6745cb77
+BA.2.86.1	d5f014ee6745cb77
 aggregate	837cfd6836b9a406
 
 # Fasta with two records, only show the aggregate checksum
@@ -116,4 +122,3 @@ print(aggregate_checksum)
 # {'MN908947.3': 'ca5e95436b957f93', 'BA.2.86.1': 'd5f014ee6745cb77'}
 # 837cfd6836b9a406
 ```
-
