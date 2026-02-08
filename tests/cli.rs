@@ -3,7 +3,11 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use std::{fs, process};
 
 use assert_cmd::Command;
+use flate2::Compression;
+use flate2::write::GzEncoder;
 use predicates::prelude::*;
+use tempfile::Builder;
+use zstd::stream::write::Encoder as ZstdEncoder;
 
 fn data_dir() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/data")
@@ -45,6 +49,40 @@ fn write_collision_fixture(path: &Path) {
         data.push('\n');
     }
     fs::write(path, data).expect("failed to write temporary collision fixture");
+}
+
+fn fixture_fasta_bytes() -> &'static [u8] {
+    b">r1\nACGTACGT\n>r2\nACGTACGA\n"
+}
+
+fn write_temp_gz() -> PathBuf {
+    let file = Builder::new()
+        .prefix("seqsum-gz-")
+        .suffix(".fasta.gz")
+        .tempfile()
+        .expect("failed to create temporary .gz file");
+    let path = file.path().to_path_buf();
+    let mut encoder = GzEncoder::new(file, Compression::default());
+    std::io::Write::write_all(&mut encoder, fixture_fasta_bytes())
+        .expect("failed to write gzip fixture");
+    let file = encoder.finish().expect("failed to finish gzip fixture");
+    file.keep().expect("failed to persist temporary .gz file");
+    path
+}
+
+fn write_temp_zst() -> PathBuf {
+    let file = Builder::new()
+        .prefix("seqsum-zst-")
+        .suffix(".fasta.zst")
+        .tempfile()
+        .expect("failed to create temporary .zst file");
+    let path = file.path().to_path_buf();
+    let mut encoder = ZstdEncoder::new(file, 0).expect("failed to create zstd encoder");
+    std::io::Write::write_all(&mut encoder, fixture_fasta_bytes())
+        .expect("failed to write zstd fixture");
+    let file = encoder.finish().expect("failed to finish zstd fixture");
+    file.keep().expect("failed to persist temporary .zst file");
+    path
 }
 
 #[test]
@@ -134,6 +172,11 @@ fn test_logging_duplicate_sequences() {
 }
 
 #[test]
+fn test_quiet_suppresses_stderr() {
+    run_success(&["duplicate-sequences.fasta", "--quiet"]).stderr(predicate::str::is_empty());
+}
+
+#[test]
 fn test_logging_collisions() {
     let unique = SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -146,6 +189,38 @@ fn test_logging_collisions() {
 
     run_success(&[&path_string, "--bits", "4"])
         .stderr(predicate::str::contains("Found checksum collisions"));
+
+    let _ = fs::remove_file(path);
+}
+
+#[test]
+fn test_gz() {
+    let path = write_temp_gz();
+    let path_string = path.to_string_lossy().to_string();
+
+    let assert = run_success(&[&path_string]);
+    let stdout = String::from_utf8(assert.get_output().stdout.clone()).unwrap();
+    let rows = parse_tsv(&stdout);
+    assert_eq!(rows.len(), 3);
+    assert_eq!(rows[0].1, "r1");
+    assert_eq!(rows[1].1, "r2");
+    assert_eq!(rows[2].1, "aggregate");
+
+    let _ = fs::remove_file(path);
+}
+
+#[test]
+fn test_zst() {
+    let path = write_temp_zst();
+    let path_string = path.to_string_lossy().to_string();
+
+    let assert = run_success(&[&path_string]);
+    let stdout = String::from_utf8(assert.get_output().stdout.clone()).unwrap();
+    let rows = parse_tsv(&stdout);
+    assert_eq!(rows.len(), 3);
+    assert_eq!(rows[0].1, "r1");
+    assert_eq!(rows[1].1, "r2");
+    assert_eq!(rows[2].1, "aggregate");
 
     let _ = fs::remove_file(path);
 }

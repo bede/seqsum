@@ -8,29 +8,33 @@ use seqsum::{DEFAULT_BITS, SeqsumConfig, format_hash, sum_nt};
 #[derive(Debug, Parser)]
 #[command(author, version, about, long_about = None)]
 struct Cli {
-    /// Path to FASTA/FASTQ input, or - for stdin.
+    /// Path to FASTA/FASTQ input, or - for stdin
     #[arg(default_value = "-")]
     input: String,
 
-    /// Replace U with T, and non-ACGT- characters with N before hashing.
+    /// Replace U with T, and non-ACGT- characters with N before hashing
     #[arg(short = 'n', long)]
     normalise: bool,
 
-    /// Require IUPAC ambiguous DNA alphabet ABCDGHKMNRSTVWY-.
+    /// Require IUPAC ambiguous DNA alphabet ABCDGHKMNRSTVWY-
     #[arg(short = 's', long)]
     strict: bool,
 
-    /// Displayed hash length in bits (4..64, multiple of 4).
+    /// Displayed hash length in bits (4..64, multiple of 4)
     #[arg(short = 'b', long, default_value_t = DEFAULT_BITS)]
     bits: u8,
 
-    /// Output only per-record checksums.
+    /// Output only per-record checksums
     #[arg(short = 'i', long)]
     individual: bool,
 
-    /// Output only the aggregate checksum.
+    /// Output only the aggregate checksum
     #[arg(short = 'a', long)]
     aggregate: bool,
+
+    /// Suppress warning messages
+    #[arg(short = 'q', long)]
+    quiet: bool,
 }
 
 fn main() -> Result<()> {
@@ -54,14 +58,16 @@ fn main() -> Result<()> {
         Ok(())
     })?;
 
-    if result.duplicate_sequences {
-        eprintln!(
-            "INFO: Found duplicate sequences: {}",
-            result.duplicate_sequence_names.join(", ")
-        );
-    }
-    if result.checksum_collisions {
-        eprintln!("WARNING: Found checksum collisions, consider increasing --bits");
+    if !cli.quiet {
+        if result.duplicate_sequences {
+            eprintln!(
+                "INFO: Found duplicate sequences: {}",
+                result.duplicate_sequence_names.join(", ")
+            );
+        }
+        if result.checksum_collisions {
+            eprintln!("WARNING: Found checksum collisions, consider increasing --bits");
+        }
     }
 
     let show_aggregate = if cli.aggregate {
