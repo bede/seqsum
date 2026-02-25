@@ -166,6 +166,12 @@ fn test_exc_aggregate_single_record() {
 #[test]
 fn test_logging_duplicate_sequences() {
     run_success(&["duplicate-sequences.fasta"])
+        .stderr(predicate::str::contains("Found duplicate sequences"));
+}
+
+#[test]
+fn test_logging_duplicate_sequences_verbose() {
+    run_success(&["duplicate-sequences.fasta", "--verbose"])
         .stderr(predicate::str::contains("Found duplicate sequences"))
         .stderr(predicate::str::contains("1"))
         .stderr(predicate::str::contains("2"));

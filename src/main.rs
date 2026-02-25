@@ -2,6 +2,7 @@ use std::io::{BufWriter, Write};
 
 use anyhow::{Result, anyhow};
 use clap::Parser;
+use log::{info, warn};
 
 use seqsum::{DEFAULT_BITS, SeqsumConfig, format_hash, sum_nt};
 
@@ -35,10 +36,26 @@ struct Cli {
     /// Suppress warning messages
     #[arg(short = 'q', long)]
     quiet: bool,
+
+    /// Show verbose output (e.g. duplicate record names)
+    #[arg(short = 'v', long)]
+    verbose: bool,
 }
 
 fn main() -> Result<()> {
     let cli = Cli::parse();
+
+    let log_level = if cli.quiet {
+        "off"
+    } else if cli.verbose {
+        "info"
+    } else {
+        "warn"
+    };
+    env_logger::Builder::from_env(env_logger::Env::default().default_filter_or(log_level))
+        .format(|buf, record| writeln!(buf, "[{}] {}", record.level(), record.args()))
+        .init();
+
     let config = SeqsumConfig {
         input: cli.input.clone(),
         normalise: cli.normalise,
@@ -58,18 +75,6 @@ fn main() -> Result<()> {
         Ok(())
     })?;
 
-    if !cli.quiet {
-        if result.duplicate_sequences {
-            eprintln!(
-                "INFO: Found duplicate sequences: {}",
-                result.duplicate_sequence_names.join(", ")
-            );
-        }
-        if result.checksum_collisions {
-            eprintln!("WARNING: Found checksum collisions, consider increasing --bits");
-        }
-    }
-
     let show_aggregate = if cli.aggregate {
         true
     } else if cli.individual {
@@ -86,5 +91,20 @@ fn main() -> Result<()> {
     }
 
     out.flush()?;
+
+    if result.duplicate_sequences {
+        if cli.verbose {
+            info!("Found duplicate sequences:");
+            for name in &result.duplicate_sequence_names {
+                info!("  {name}");
+            }
+        } else {
+            warn!("Found duplicate sequences");
+        }
+    }
+    if result.checksum_collisions {
+        warn!("Found checksum collisions, consider increasing --bits");
+    }
+
     Ok(())
 }
