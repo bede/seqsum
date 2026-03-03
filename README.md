@@ -1,11 +1,11 @@
-[![Tests](https://github.com/bede/seqsum/actions/workflows/test.yml/badge.svg)](https://github.com/bede/seqsum/actions/workflows/test.yml)
+[![Tests](https://img.shields.io/github/actions/workflow/status/bede/seqsum/test.yml?style=flat-square)](https://github.com/bede/seqsum/actions/workflows/test.yml) [![Crates.io version](https://img.shields.io/crates/v/seqsum?style=flat-square)](https://crates.io/crates/seqsum)
 
 # Seqsum
 
 > [!WARNING]  
-> Seqsum was rewritten in Rust in 0.3.0. The original Python version of seqsum and how to use is archived in the [`python`](https://github.com/bede/seqsum/tree/python) branch. It remains available on PyPI.
+> Seqsum was rewritten in Rust in 0.3.0. The original Python version of seqsum and how to use it is archived in the [`python`](https://github.com/bede/seqsum/tree/python) branch. It remains available on PyPI.
 
-Robust checksums for nucleotide sequences. Accepts one or more `fast[a|q][.gz|.zst]` files or standard input. Generates an *aggregate* checksum for each input file by default, similar to `md5sum`/`sha256sum`. Warnings are shown for duplicate sequences and within-collection checksum collisions at the selected bit depth. Sequences are uppercased before hashing with [RapidHash](https://github.com/Nicoshev/rapidhash) (v3) and may be normalised (with `-n`) to use only `ACGTN-`. Read IDs and FASTQ base quality scores do not inform the checksum. Output is tab-delimited text to stdout.
+Robust checksums for nucleotide sequences. Accepts one or more `fast[a|q][.gz|.zst]` files or standard input. Generates an *aggregate* checksum for each input file by default, similar to `md5sum`/`sha256sum`. Warnings are shown for duplicate sequences and within-collection checksum collisions at the selected bit depth. Sequences are uppercased before hashing with [RapidHash](https://github.com/Nicoshev/rapidhash) and may be normalised (with `-n`) to use only `ACGTN-`. Read IDs and FASTQ base quality scores do not inform the checksum. Output is tab-delimited text to stdout.
 
 By default, seqsum outputs one aggregate checksum per file. Use `--individual` (`-i`) for per-record checksums, or `--all` (`-a`) for both individual and aggregate checksums. These flags are mutually exclusive.
 
