@@ -167,7 +167,7 @@ where
     let checksum_collisions = unique_truncated_hashes.len() < first_name_by_hash.len();
 
     Ok(SeqsumResult {
-        aggregate: (record_count > 1).then_some(aggregate_hash),
+        aggregate: (record_count > 0).then_some(aggregate_hash),
         duplicate_sequences,
         duplicate_sequence_names,
         checksum_collisions,

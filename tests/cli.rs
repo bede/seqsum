@@ -23,16 +23,11 @@ fn run_failure(args: &[&str]) -> assert_cmd::assert::Assert {
     cmd.args(args).current_dir(data_dir()).assert().failure()
 }
 
-fn parse_tsv(stdout: &str) -> Vec<(String, String)> {
+fn parse_tsv(stdout: &str) -> Vec<Vec<String>> {
     stdout
         .lines()
         .filter(|line| !line.trim().is_empty())
-        .map(|line| {
-            let (hash, id) = line
-                .split_once('\t')
-                .unwrap_or_else(|| panic!("missing tab separator in line: {line}"));
-            (hash.to_string(), id.to_string())
-        })
+        .map(|line| line.split('\t').map(|s| s.to_string()).collect())
         .collect()
 }
 
@@ -91,41 +86,134 @@ fn test_version_cli() {
 }
 
 #[test]
-fn test_single_record_cli() {
+fn test_default_single_record() {
     let assert = run_success(&["MN908947.fasta"]);
     let stdout = String::from_utf8(assert.get_output().stdout.clone()).unwrap();
     let rows = parse_tsv(&stdout);
     assert_eq!(rows.len(), 1);
-    assert_eq!(rows[0].1, "MN908947.3");
-    assert_eq!(rows[0].0, "33ba13564e0a63e3");
+    assert_eq!(rows[0], vec!["33ba13564e0a63e3", "MN908947.fasta"]);
 }
 
 #[test]
-fn test_multiple_records_cli() {
+fn test_default_multiple_records() {
     let assert = run_success(&["MN908947-BA_2_86_1.fasta"]);
     let stdout = String::from_utf8(assert.get_output().stdout.clone()).unwrap();
     let rows = parse_tsv(&stdout);
+    assert_eq!(rows.len(), 1);
+    assert_eq!(
+        rows[0],
+        vec!["d3a94eb82357ece5", "MN908947-BA_2_86_1.fasta"]
+    );
+}
+
+#[test]
+fn test_individual_single_record() {
+    let assert = run_success(&["-i", "MN908947.fasta"]);
+    let stdout = String::from_utf8(assert.get_output().stdout.clone()).unwrap();
+    let rows = parse_tsv(&stdout);
+    assert_eq!(rows.len(), 1);
+    assert_eq!(rows[0], vec!["33ba13564e0a63e3", "MN908947.3"]);
+}
+
+#[test]
+fn test_individual_multiple_records() {
+    let assert = run_success(&["-i", "MN908947-BA_2_86_1.fasta"]);
+    let stdout = String::from_utf8(assert.get_output().stdout.clone()).unwrap();
+    let rows = parse_tsv(&stdout);
+    assert_eq!(rows.len(), 2);
+    assert_eq!(rows[0], vec!["33ba13564e0a63e3", "MN908947.3"]);
+    assert_eq!(rows[1], vec!["9fef3b61d54d8902", "BA.2.86.1"]);
+}
+
+#[test]
+fn test_all_mode() {
+    let assert = run_success(&["-a", "MN908947-BA_2_86_1.fasta"]);
+    let stdout = String::from_utf8(assert.get_output().stdout.clone()).unwrap();
+    let rows = parse_tsv(&stdout);
     assert_eq!(rows.len(), 3);
-    assert_eq!(rows[0].1, "MN908947.3");
-    assert_eq!(rows[1].1, "BA.2.86.1");
-    assert_eq!(rows[2].1, "aggregate");
-    assert_eq!(rows[0].0, "33ba13564e0a63e3");
-    assert_eq!(rows[1].0, "9fef3b61d54d8902");
-    assert_eq!(rows[2].0, "d3a94eb82357ece5");
+    assert_eq!(
+        rows[0],
+        vec!["33ba13564e0a63e3", "MN908947.3", "MN908947-BA_2_86_1.fasta"]
+    );
+    assert_eq!(
+        rows[1],
+        vec!["9fef3b61d54d8902", "BA.2.86.1", "MN908947-BA_2_86_1.fasta"]
+    );
+    assert_eq!(
+        rows[2],
+        vec!["d3a94eb82357ece5", "sum", "MN908947-BA_2_86_1.fasta"]
+    );
+}
+
+#[test]
+fn test_multi_file() {
+    let assert = run_success(&["MN908947.fasta", "MN908947-BA_2_86_1.fasta"]);
+    let stdout = String::from_utf8(assert.get_output().stdout.clone()).unwrap();
+    let rows = parse_tsv(&stdout);
+    assert_eq!(rows.len(), 2);
+    assert_eq!(rows[0], vec!["33ba13564e0a63e3", "MN908947.fasta"]);
+    assert_eq!(
+        rows[1],
+        vec!["d3a94eb82357ece5", "MN908947-BA_2_86_1.fasta"]
+    );
+}
+
+#[test]
+fn test_multi_file_all_mode() {
+    let assert = run_success(&["-a", "MN908947.fasta", "MN908947-BA_2_86_1.fasta"]);
+    let stdout = String::from_utf8(assert.get_output().stdout.clone()).unwrap();
+    let rows = parse_tsv(&stdout);
+    assert_eq!(rows.len(), 5);
+    assert_eq!(
+        rows[0],
+        vec!["33ba13564e0a63e3", "MN908947.3", "MN908947.fasta"]
+    );
+    assert_eq!(rows[1], vec!["33ba13564e0a63e3", "sum", "MN908947.fasta"]);
+    assert_eq!(
+        rows[2],
+        vec!["33ba13564e0a63e3", "MN908947.3", "MN908947-BA_2_86_1.fasta"]
+    );
+    assert_eq!(
+        rows[3],
+        vec!["9fef3b61d54d8902", "BA.2.86.1", "MN908947-BA_2_86_1.fasta"]
+    );
+    assert_eq!(
+        rows[4],
+        vec!["d3a94eb82357ece5", "sum", "MN908947-BA_2_86_1.fasta"]
+    );
+}
+
+#[test]
+fn test_stdin_default() {
+    let mut cmd = Command::new(env!("CARGO_BIN_EXE_seqsum"));
+    let assert = cmd
+        .pipe_stdin(data_dir().join("MN908947.fasta"))
+        .unwrap()
+        .assert()
+        .success();
+    let stdout = String::from_utf8(assert.get_output().stdout.clone()).unwrap();
+    let rows = parse_tsv(&stdout);
+    assert_eq!(rows.len(), 1);
+    assert_eq!(rows[0], vec!["33ba13564e0a63e3", "-"]);
+}
+
+#[test]
+fn test_individual_all_conflict() {
+    let mut cmd = Command::new(env!("CARGO_BIN_EXE_seqsum"));
+    cmd.args(["-i", "-a", "MN908947.fasta"])
+        .current_dir(data_dir())
+        .assert()
+        .failure();
 }
 
 #[test]
 fn test_normalise() {
-    let assert = run_success(&["normalise.fasta", "--normalise"]);
+    let assert = run_success(&["-i", "normalise.fasta", "--normalise"]);
     let stdout = String::from_utf8(assert.get_output().stdout.clone()).unwrap();
     let rows = parse_tsv(&stdout);
-    assert_eq!(rows.len(), 3);
-    assert_eq!(rows[0].1, "t1");
-    assert_eq!(rows[1].1, "t2");
-    assert_eq!(rows[2].1, "aggregate");
-    assert_eq!(rows[0].0, "3f4ec3194ceb8248");
-    assert_eq!(rows[0].0, rows[1].0);
-    assert_eq!(rows[2].0, "7e9d863299d70490");
+    assert_eq!(rows.len(), 2);
+    assert_eq!(rows[0], vec!["3f4ec3194ceb8248", "t1"]);
+    assert_eq!(rows[0][0], rows[1][0]);
 }
 
 #[test]
@@ -155,12 +243,6 @@ fn test_exc_invalid_bit_depth() {
     run_failure(&["MN908947.fasta", "--bits", "9"]).stderr(predicate::str::contains(
         "bit depth must be a multiple of 4 between 4 and 64",
     ));
-}
-
-#[test]
-fn test_exc_aggregate_single_record() {
-    run_failure(&["MN908947.fasta", "--aggregate"])
-        .stderr(predicate::str::contains("aggregate checksum unavailable"));
 }
 
 #[test]
@@ -207,10 +289,8 @@ fn test_gz() {
     let assert = run_success(&[&path_string]);
     let stdout = String::from_utf8(assert.get_output().stdout.clone()).unwrap();
     let rows = parse_tsv(&stdout);
-    assert_eq!(rows.len(), 3);
-    assert_eq!(rows[0].1, "r1");
-    assert_eq!(rows[1].1, "r2");
-    assert_eq!(rows[2].1, "aggregate");
+    assert_eq!(rows.len(), 1);
+    assert_eq!(rows[0][1], path_string);
 
     let _ = fs::remove_file(path);
 }
@@ -223,10 +303,8 @@ fn test_zst() {
     let assert = run_success(&[&path_string]);
     let stdout = String::from_utf8(assert.get_output().stdout.clone()).unwrap();
     let rows = parse_tsv(&stdout);
-    assert_eq!(rows.len(), 3);
-    assert_eq!(rows[0].1, "r1");
-    assert_eq!(rows[1].1, "r2");
-    assert_eq!(rows[2].1, "aggregate");
+    assert_eq!(rows.len(), 1);
+    assert_eq!(rows[0][1], path_string);
 
     let _ = fs::remove_file(path);
 }
